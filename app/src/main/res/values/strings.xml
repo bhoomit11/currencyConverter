@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">PayPayCurrencyConverter</string>
+    <string name="enter_value">Enter Value</string>
+    <string name="select_currency">Select Currency</string>
+    <string name="nothing">Nothing</string>
+</resources>
