@@ -22,9 +22,7 @@ import javax.inject.Inject
 @HiltViewModel
 class MainCurrencyViewModel @Inject constructor(
     @ApplicationContext appContext: Context,
-    private val mainCurrencyRepository: MainCurrencyRepository,
-    private val gson: Gson,
-    private val appPreference: AppPreference
+    private val getCurrencyUseCase: GetCurrencyUseCase,
 ) : ViewModel() {
 
 
@@ -40,11 +38,8 @@ class MainCurrencyViewModel @Inject constructor(
     init {
         if (!appContext.isWorkScheduled(TAG_API_WORK)) { // check if your work is not already scheduled
             scheduleWorker(appContext) // schedule your work
-            // To call API for the very first time
-            if (appPreference.currencyData.isNotBlank()) {
-                getEmployees()
-            }
         }
+        getEmployees()
     }
 
     /**
@@ -84,29 +79,19 @@ class MainCurrencyViewModel @Inject constructor(
      */
     private fun getEmployees() = viewModelScope.launch {
         responseLiveData.postValue(ResponseModel.loading(null))
-        if (appPreference.currencyData.isNotBlank()) {
-            responseLiveData.postValue(ResponseModel.success(parseResponse()))
-        } else {
-            mainCurrencyRepository.getCurrency().let { res ->
-                appPreference.currencyData =
-                    res.body()?.asJsonObject.toString() //Stored data to local
-                if (res.isSuccessful) {
-                    responseLiveData.postValue(ResponseModel.success(parseResponse()))
-                } else {
-                    responseLiveData.postValue(
-                        ResponseModel.error(
-                            res.errorBody().toString(),
-                            null
-                        )
-                    )
-                }
-            }
+
+        val response = getCurrencyUseCase.processCurrencyListUseCase()
+        try {
+            responseLiveData.postValue(ResponseModel.success(response))
+        } catch (e: Exception) {
+            responseLiveData.postValue(
+                ResponseModel.error(
+                    e.message.toString(),
+                    null
+                )
+            )
         }
     }
 
-    private fun parseResponse(): List<CurrenciesResponse> {
-        val map =
-            gson.fromJson(appPreference.currencyData, HashMap<String, String>().javaClass)
-        return map.entries.map { CurrenciesResponse(it.key, it.value) }
-    }
+
 }
