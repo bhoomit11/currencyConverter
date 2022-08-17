@@ -8,11 +8,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.*
 import com.app.paypaycurrencyconverter.models.CurrenciesResponse
 import com.app.paypaycurrencyconverter.models.ResponseModel
-import com.app.paypaycurrencyconverter.utils.AppPreference
+import com.app.paypaycurrencyconverter.ui.home.usecases.ConvertCurrencyUseCase
+import com.app.paypaycurrencyconverter.ui.home.usecases.GetCurrencyUseCase
 import com.app.paypaycurrencyconverter.utils.isWorkScheduled
 import com.app.paypaycurrencyconverter.worker.BackgroundTask
 import com.app.paypaycurrencyconverter.worker.BackgroundTask.Companion.KEY_RESULT
-import com.google.gson.Gson
+import com.google.gson.JsonElement
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ import javax.inject.Inject
 class MainCurrencyViewModel @Inject constructor(
     @ApplicationContext appContext: Context,
     private val getCurrencyUseCase: GetCurrencyUseCase,
+    private val convertCurrencyUseCase: ConvertCurrencyUseCase,
 ) : ViewModel() {
 
 
@@ -30,10 +32,17 @@ class MainCurrencyViewModel @Inject constructor(
         const val TAG_API_WORK = "myAPIwork";
     }
 
-    private val responseLiveData = MutableLiveData<ResponseModel<List<CurrenciesResponse>>>()
+    private val currencyListResponseLiveData =
+        MutableLiveData<ResponseModel<List<CurrenciesResponse>>>()
 
-    val response: LiveData<ResponseModel<List<CurrenciesResponse>>>
-        get() = responseLiveData
+    private val currencyConvertResponseLiveData =
+        MutableLiveData<ResponseModel<JsonElement>>()
+
+    val currencyListResponse: LiveData<ResponseModel<List<CurrenciesResponse>>>
+        get() = currencyListResponseLiveData
+
+    val currencyConvertResponse: LiveData<ResponseModel<JsonElement>>
+        get() = currencyConvertResponseLiveData
 
     init {
         if (!appContext.isWorkScheduled(TAG_API_WORK)) { // check if your work is not already scheduled
@@ -77,14 +86,34 @@ class MainCurrencyViewModel @Inject constructor(
     /**
      * Get currency list from API
      */
+
     private fun getEmployees() = viewModelScope.launch {
-        responseLiveData.postValue(ResponseModel.loading(null))
+        currencyListResponseLiveData.postValue(ResponseModel.loading(null))
 
         val response = getCurrencyUseCase.processCurrencyListUseCase()
         try {
-            responseLiveData.postValue(ResponseModel.success(response))
+            currencyListResponseLiveData.postValue(ResponseModel.success(response))
         } catch (e: Exception) {
-            responseLiveData.postValue(
+            currencyListResponseLiveData.postValue(
+                ResponseModel.error(
+                    e.message.toString(),
+                    null
+                )
+            )
+        }
+    }
+
+    fun convert(
+        value: Double,
+        from: String,
+        to: String
+    ) = viewModelScope.launch {
+        val response = convertCurrencyUseCase.processConvertCurrencyUseCase(value, from, to)
+
+        try {
+            currencyConvertResponseLiveData.postValue(ResponseModel.success(response))
+        } catch (e: Exception) {
+            currencyConvertResponseLiveData.postValue(
                 ResponseModel.error(
                     e.message.toString(),
                     null
